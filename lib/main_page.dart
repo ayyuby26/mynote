@@ -1,13 +1,14 @@
-import 'dart:convert';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/intl.dart';
 import 'package:mynote/editor_page.dart';
-import 'package:mynote/model/notes.dart';
+import 'package:mynote/notes_list.dart';
 import 'package:quill_delta/quill_delta.dart';
 import 'package:zefyr/zefyr.dart';
+
+import 'cubit/notes_cubit/notes_cubit.dart';
 
 class MainPage extends StatefulWidget {
   @override
@@ -15,93 +16,64 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
+  final _animatedListKey = GlobalKey<AnimatedListState>(debugLabel: "anim");
+  final _keyScaff = GlobalKey<ScaffoldState>(debugLabel: "scaff");
+  final _keyScaff1 = GlobalKey<ScaffoldState>(debugLabel: "scaf1");
+
+  @override
+  void dispose() {
+    context.bloc<NotesCubit>().timerCancel();
+    super.dispose();
+  }
+
+  final _offSetTween = Tween(
+    begin: const Offset(1, 0),
+    end: Offset.zero,
+  );
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("My Note"),
-      ),
-      body: FutureBuilder(
-        future: Hive.openBox("notes"),
-        builder: (BuildContext context, AsyncSnapshot snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            if (snapshot.hasError)
-              return Center(child: Text("error"));
-            else {
-              var notesBox = Hive.box("notes");
-              if (notesBox.length == 0)
-              // notes.add(Notes("id1", "title1", "body1"));
-              {
-                return Center(child: Text("belum ada data"));
-              } else {
-                // notes.deleteAt(0);
-                print(DateTime.now());
-                // ignore: deprecated_member_use
-                return WatchBoxBuilder(
-                  box: notesBox,
-                  builder: (_, v) => ListView.builder(
-                      itemCount: notesBox.length,
-                      itemBuilder: (_, i) {
-                        Notes note = notesBox.getAt(i);
-                        return Card(
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) => EditorPage(
-                                            id: i,
-                                            title: note.title,
-                                            content: NotusDocument.fromJson(
-                                                jsonDecode(note.body)),
-                                          )));
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Column(
-                                children: [
-                                  Text(note.title),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                );
-              }
-            }
-          } else
-            return Center(
-              child: CupertinoActivityIndicator(
-                radius: 30,
-              ),
-            );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        child: Icon(Icons.add),
-        onPressed: () {
-          _loadDocument();
-          Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => EditorPage(
-                        title: "",
-                        content: _loadDocument(),
-                      )));
-        },
-      ),
-    );
+    Intl.defaultLocale = 'en_US';
+
+    return BlocBuilder<NotesCubit, NotesState>(builder: (context, state) {
+      final int _deleteTiming = state.props[1];
+      final NotesCubit _notesCubit = context.bloc<NotesCubit>();
+      print(state.props[2] ?? "null bruh");
+      //TODO: ganti veri zefyr karena gk cocok dengan hydrated_bloc dengan syarat harus ganti2 project
+      return Scaffold(
+        key: _keyScaff,
+        appBar: AppBar(
+          title: Text("My Notes"),
+        ),
+        body: NotesList(
+          animatedListKey: _animatedListKey,
+          keyScaff: _keyScaff1,
+          offSetTween: _offSetTween,
+        ),
+        floatingActionButton: FloatingActionButton(
+          heroTag: "+",
+          child: Icon(Icons.add),
+          onPressed: () {
+            _keyScaff.currentState.hideCurrentSnackBar();
+            print(_deleteTiming);
+            if (_deleteTiming != 10 && _notesCubit.getTimer() != null)
+              _notesCubit.timerCancel();
+            Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => EditorPage(
+                          title: "",
+                          content: _loadDocument(),
+                          animatedListKey: _animatedListKey,
+                          list: [],
+                        )));
+          },
+        ),
+      );
+    });
   }
 
   NotusDocument _loadDocument() {
-    // final file = File(Directory.systemTemp.path + '/quick_start.json');
-    // if (await file.exists()) {
-    //   final contents = await file
-    //       .readAsString()
-    //       .then((data) => Future.delayed(Duration(seconds: 1), () => data));
-    //   return NotusDocument.fromJson(jsonDecode(contents));
-    // }
     final delta = Delta()..insert('\n');
     return NotusDocument.fromDelta(delta);
   }

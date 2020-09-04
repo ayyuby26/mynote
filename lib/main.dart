@@ -1,15 +1,14 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get/get.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:mynote/cubit/notes_cubit/notes_cubit.dart';
+import 'const.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:hive/hive.dart';
-import 'package:mynote/model/notes.dart';
 import './main_page.dart';
-import 'package:path_provider/path_provider.dart' as pathProvider;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  var appPath = await pathProvider.getApplicationDocumentsDirectory();
-  Hive.init(appPath.path);
-  Hive.registerAdapter(NotesAdapter());
+  HydratedBloc.storage = await HydratedStorage.build();
   runApp(MyApp());
 }
 
@@ -21,19 +20,21 @@ class FakeFocusIntent extends Intent {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      // disable default arrows focus changes.
-      // otherwise it makes the keyboard flicker when we move with arrows)
-      shortcuts: Map<LogicalKeySet, Intent>.from(WidgetsApp.defaultShortcuts)
-        ..addAll(<LogicalKeySet, Intent>{
-          LogicalKeySet(LogicalKeyboardKey.arrowLeft): const FakeFocusIntent(),
-          LogicalKeySet(LogicalKeyboardKey.arrowRight): const FakeFocusIntent(),
-          LogicalKeySet(LogicalKeyboardKey.arrowDown): const FakeFocusIntent(),
-          LogicalKeySet(LogicalKeyboardKey.arrowUp): const FakeFocusIntent(),
-        }),
-      debugShowCheckedModeBanner: false,
-      home: MainPage(),
-      title: "My Note",
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => NotesCubit()),
+      ],
+      child: GetMaterialApp(
+        theme: themeData,
+        home: MaterialApp(
+            theme: themeData,
+            title: "MyNote",
+            // disable default arrows focus changes.
+            // otherwise it makes the keyboard flicker when we move with arrows)
+            shortcuts: shortcutsData,
+            debugShowCheckedModeBanner: false,
+            home: MainPage()),
+      ),
     );
   }
 }

@@ -1,18 +1,29 @@
+import 'package:flutter_vector_icons/flutter_vector_icons.dart';
 import 'dart:convert';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
+import 'package:get/get.dart';
+import 'package:mynote/const.dart';
+import 'package:mynote/cubit/notes_cubit/notes_cubit.dart';
 import 'package:zefyr/zefyr.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import 'model/notes.dart';
 
 class EditorPage extends StatefulWidget {
-  final int id;
+  final String id;
   final String title;
   final NotusDocument content;
+  final GlobalKey<AnimatedListState> animatedListKey;
+  final List<MyNote> list;
 
   const EditorPage({
     this.id,
     @required this.title,
     @required this.content,
+    @required this.animatedListKey,
+    @required this.list,
   });
 
   @override
@@ -20,98 +31,129 @@ class EditorPage extends StatefulWidget {
         id: id,
         title: title,
         content: content,
+        animatedListKey: animatedListKey,
+        list: list,
       );
 }
 
 class _EditorPageState extends State<EditorPage> {
+  final _titleKeyTextField = GlobalKey(debugLabel: "zxc");
+
   final _titleController = TextEditingController();
   ZefyrController _bodyController;
 
   final _titleFocusNode = FocusNode();
   final _contentFocusNode = FocusNode();
 
-  final int id;
+  final String id;
   final String title;
   NotusDocument content;
+  final GlobalKey<AnimatedListState> animatedListKey;
+  final List<MyNote> list;
 
   _EditorPageState({
     this.id,
     @required this.title,
     @required this.content,
+    @required this.animatedListKey,
+    @required this.list,
   });
 
   @override
-  void initState() {
-    super.initState();
-    setState(() {
-      _titleController.text = title;
-      _bodyController = ZefyrController(content);
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final body = (_bodyController == null)
-        ? Center(child: CircularProgressIndicator())
+    Widget body(bool _editingMode) => _bodyController == null
+        ? Center(child: Center(child: CupertinoActivityIndicator(radius: 30)))
         : ZefyrScaffold(
-            child: ZefyrEditor(
-              padding: EdgeInsets.all(16),
-              controller: _bodyController,
-              focusNode: _contentFocusNode,
+            child: Obx(
+              () => ZefyrEditor(
+                  autofocus: false,
+                  mode: _editingMode ? ZefyrMode.edit : ZefyrMode.select,
+                  padding: EdgeInsets.all(16),
+                  controller: _bodyController,
+                  focusNode: _contentFocusNode,
+                  keyboardAppearance: Brightness.light),
             ),
           );
 
-    id == null
-        ? _titleFocusNode.requestFocus()
-        : _contentFocusNode.requestFocus();
+    void _saveNote(BuildContext context) {
+      final _notesCubit = context.bloc<NotesCubit>();
+      final title = _titleController.text;
+      final content = _bodyController.document;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: TextField(
-          focusNode: _titleFocusNode,
-          controller: _titleController,
-          decoration: InputDecoration(
-            border: InputBorder.none,
-            hintText: "note title",
-          ),
-        ),
-        actions: <Widget>[
-          Builder(
-            builder: (context) => IconButton(
-              icon: Icon(Icons.save),
-              onPressed: () => _saveDocument(context),
+      if (title.isEmpty && content.length == 1)
+        Get.snackbar(
+          "Warning",
+          'must fill at least one column.',
+          colorText: white,
+        );
+      else {
+        final contents = jsonEncode(content);
+        if (id.isNull) {
+          final _n = list;
+          final _i = _n.isEmpty ? 0 : _n.length - 1;
+          final _animKey = animatedListKey.currentState;
+
+          _notesCubit.addMyNote(title, contents);
+          if (_animKey != null) _animKey.insertItem(_i);
+          Navigator.pop(context);
+          Get.snackbar("Message", 'Note added', colorText: white);
+        } else {
+          _notesCubit.editMyNote(id, title, contents);
+          Get.snackbar("Message", "Saved", colorText: white);
+          _notesCubit.editingModeFalse();
+        }
+      }
+    }
+
+// obx dan blocbuilder tadi dihapus
+
+    final _notesCubit = context.bloc<NotesCubit>();
+    _notesCubit.setEditingMode();
+
+    return BlocBuilder<NotesCubit, NotesState>(builder: (context, state) {
+      final _editingMode = state.props[2] as bool;
+      print(state.props[2] ?? "null bro");
+      return Scaffold(
+        appBar: AppBar(
+          title: Obx(
+            () => TextField(
+              cursorWidth: 1.5,
+              cursorColor: white,
+              style: TextStyle(
+                decorationThickness: 2,
+                color: white,
+              ),
+              enabled: _editingMode ? true : false,
+              key: _titleKeyTextField,
+              focusNode: _titleFocusNode,
+              controller: _titleController,
+              decoration: InputDecoration(
+                hintStyle: TextStyle(color: Colors.white60),
+                // fillColor: Colors.white,
+                // focusColor: Colors.white,
+                border: InputBorder.none,
+                hintText: "note title",
+              ),
             ),
-          )
-        ],
-      ),
-      body: body,
-    );
-  }
-
-  void _saveDocument(BuildContext context) {
-    // Notus documents can be easily serialized to JSON by passing to
-    // `jsonEncode` directly:
-    final contents = jsonEncode(_bodyController.document);
-    // For this example we save our document to a temporary file.
-    // final file = File(Directory.systemTemp.path + '/quick_start.json');
-    // And show a snack bar on success.
-    print(contents);
-    var notes = Hive.box("notes");
-
-    if (id == null) {
-      notes
-          .add(
-              Notes(DateTime.now().toString(), _titleController.text, contents))
-          .then((value) {
-        print(value);
-        Scaffold.of(context).showSnackBar(SnackBar(content: Text('Saved.')));
-      });
-    } else
-      notes.putAt(id,
-          Notes(DateTime.now().toString(), _titleController.text, contents));
-    Scaffold.of(context).showSnackBar(SnackBar(content: Text('Saved.')));
-    // file.writeAsString(contents).then((_) {
-    //   Scaffold.of(context).showSnackBar(SnackBar(content: Text('Saved.')));
-    // });
+          ),
+          actions: <Widget>[
+            Obx(
+              () => IconButton(
+                icon: Icon(_editingMode
+                    ? MaterialCommunityIcons.feather
+                    : CupertinoIcons.pen),
+                onPressed: () {
+                  if (_editingMode) {
+                    _saveNote(context);
+                  } else
+                    _notesCubit.editingModeTrue();
+                },
+              ),
+            ),
+          ],
+        ),
+        body: body(_editingMode),
+      );
+    });
   }
 }

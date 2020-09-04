@@ -1,15 +1,21 @@
-import 'package:hive/hive.dart';
-part 'notes.g.dart';
-@HiveType(typeId : 1)
-class Notes {
-  @HiveField(0)
-  String id;
+class MyNote {
+  final String id;
+  String title, content;
 
-  @HiveField(1)
-  String title;
+  MyNote(
+    this.id,
+    this.title,
+    this.content,
+  );
 
-  @HiveField(2)
-  String body;
+  MyNote.fromJson(Map<String, dynamic> i)
+      : id = i['id'],
+        title = i['title'],
+        content = i['content'];
 
-  Notes(this.id, this.title, this.body);
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'content': content,
+      };
 }
