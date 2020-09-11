@@ -14,23 +14,7 @@ final themeData = ThemeData(
   primaryColor: primary, //AppBar
   cursorColor: primary,
   splashColor: primary, //  while on Pressed Color
-  // backgroundColor: light,
   applyElevationOverlayColor: true,
-
-  colorScheme: ColorScheme(
-      primary: Color(0XFF1b262c),
-      primaryVariant: Color(0XFFfca311),
-      secondary: light,
-      secondaryVariant: primary,
-      surface: primary, //SnackBar
-      onSurface: primary, //SnackBar too
-      background: Color(0XFFfca311),
-      error: Color(0XFFfca311),
-      onPrimary: Color(0XFF1b262c),
-      onSecondary: white,
-      onBackground: Color(0XFFfca311),
-      onError: Color(0XFFfca311),
-      brightness: Brightness.light),
   textSelectionColor: light,
   accentColor: Color(0xff14213d),
   appBarTheme: AppBarTheme(
